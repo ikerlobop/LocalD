@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoboGPT</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #chat {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+        }
+        #input {
+            width: 80%;
+            padding: 10px;
+        }
+        #send {
+            padding: 10px 20px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            position: relative;
+            white-space: pre-wrap; /* Para que el código se ajuste */
+        }
+        .copy-button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .copy-button:hover {
+            background-color: #0056b3;
+        }
+        p {
+            margin: 10px 0; /* Espaciado entre párrafos */
+            line-height: 1.5; /* Mejor legibilidad */
+        }
+    </style>
+</head>
+<body>
+    <h1>LoboGPT</h1>
+    <div id="chat"></div>
+    <input type="text" id="input" placeholder="Escribe tu pregunta aquí...">
+    <button id="send">Enviar</button>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('input');
+        const sendButton = document.getElementById('send');
+
+        // Función para formatear la respuesta
+        function formatResponse(response) {
+            // Detectar bloques de código
+            const codeBlockRegex = /```([\s\S]*?)```/g;
+            let formattedResponse = response;
+
+            // Reemplazar bloques de código con un formato especial
+            formattedResponse = formattedResponse.replace(codeBlockRegex, (match, code) => {
+                return `<pre>${code}<button class="copy-button" onclick="copyToClipboard(this)">Copiar</button></pre>`;
+            });
+
+            // Reemplazar saltos de línea en el texto normal con <br>
+            formattedResponse = formattedResponse.replace(/\n/g, '<br>');
+
+            return formattedResponse;
+        }
+
+        // Función para copiar el contenido al portapapeles
+        function copyToClipboard(button) {
+            const code = button.previousSibling.textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                button.textContent = '¡Copiado!';
+                setTimeout(() => {
+                    button.textContent = 'Copiar';
+                }, 2000);
+            });
+        }
+
+        sendButton.addEventListener('click', async () => {
+            const question = input.value;
+            if (!question) return;
+
+            // Mostrar la pregunta en el chat
+            chat.innerHTML += `<p><strong>Tú:</strong> ${question}</p>`;
+
+            // Enviar la pregunta al backend
+            try {
+                const response = await fetch('http://localhost:5000/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question }),
+                });
+
+                const data = await response.json();
+                if (data.response) {
+                    // Formatear la respuesta para mostrar bloques de código y texto normal
+                    const formattedResponse = formatResponse(data.response);
+                    chat.innerHTML += `<p><strong>LLaMA 3:</strong> ${formattedResponse}</p>`;
+                } else {
+                    chat.innerHTML += `<p><strong>Error:</strong> No se pudo obtener una respuesta.</p>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                chat.innerHTML += `<p><strong>Error:</strong> No se pudo conectar al servidor.</p>`;
+            }
+
+            // Limpiar el input
+            input.value = '';
+        });
+    </script>
+</body>
+</html>
