@@ -29,7 +29,7 @@
             padding: 10px;
             border-radius: 5px;
             position: relative;
-            white-space: pre-wrap; /* Para que el código se ajuste */
+            white-space: pre-wrap;
         }
         .copy-button {
             position: absolute;
@@ -46,8 +46,8 @@
             background-color: #0056b3;
         }
         p {
-            margin: 10px 0; /* Espaciado entre párrafos */
-            line-height: 1.5; /* Mejor legibilidad */
+            margin: 10px 0;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -62,24 +62,17 @@
         const input = document.getElementById('input');
         const sendButton = document.getElementById('send');
 
-        // Función para formatear la respuesta
-        function formatResponse(response) {
-            // Detectar bloques de código
-            const codeBlockRegex = /```([\s\S]*?)```/g;
-            let formattedResponse = response;
-
-            // Reemplazar bloques de código con un formato especial
-            formattedResponse = formattedResponse.replace(codeBlockRegex, (match, code) => {
-                return `<pre>${code}<button class="copy-button" onclick="copyToClipboard(this)">Copiar</button></pre>`;
-            });
-
-            // Reemplazar saltos de línea en el texto normal con <br>
-            formattedResponse = formattedResponse.replace(/\n/g, '<br>');
-
-            return formattedResponse;
+        // Función para escapar caracteres HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
 
-        // Función para copiar el contenido al portapapeles
+        // Función para copiar al portapapeles
         function copyToClipboard(button) {
             const code = button.previousSibling.textContent;
             navigator.clipboard.writeText(code).then(() => {
@@ -87,17 +80,29 @@
                 setTimeout(() => {
                     button.textContent = 'Copiar';
                 }, 2000);
+            }).catch((error) => {
+                console.error('Error al copiar:', error);
+                button.textContent = 'Error al copiar';
             });
+        }
+
+        // Función para formatear la respuesta
+        function formatResponse(response) {
+            const codeBlockRegex = /```([\s\S]*?)```/g;
+            let formattedResponse = response.replace(codeBlockRegex, (match, code) => {
+                const escapedCode = escapeHtml(code);
+                return `<pre>${escapedCode}<button class="copy-button" onclick="copyToClipboard(this)">Copiar</button></pre>`;
+            });
+            formattedResponse = formattedResponse.replace(/\n/g, '<br>');
+            return formattedResponse;
         }
 
         sendButton.addEventListener('click', async () => {
             const question = input.value;
             if (!question) return;
 
-            // Mostrar la pregunta en el chat
-            chat.innerHTML += `<p><strong>Tú:</strong> ${question}</p>`;
+            chat.innerHTML += `<p><strong>Tú:</strong> ${escapeHtml(question)}</p>`;
 
-            // Enviar la pregunta al backend
             try {
                 const response = await fetch('http://localhost:5000/ask', {
                     method: 'POST',
@@ -109,7 +114,6 @@
 
                 const data = await response.json();
                 if (data.response) {
-                    // Formatear la respuesta para mostrar bloques de código y texto normal
                     const formattedResponse = formatResponse(data.response);
                     chat.innerHTML += `<p><strong>LLaMA 3:</strong> ${formattedResponse}</p>`;
                 } else {
@@ -120,7 +124,6 @@
                 chat.innerHTML += `<p><strong>Error:</strong> No se pudo conectar al servidor.</p>`;
             }
 
-            // Limpiar el input
             input.value = '';
         });
     </script>
